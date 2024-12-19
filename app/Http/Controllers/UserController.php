@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\UserCreated;
 
 class UserController extends Controller
 {
@@ -13,7 +15,6 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        // Initialize the query builder
         $query = User::query();
 
         // Handle search if provided
@@ -49,6 +50,7 @@ class UserController extends Controller
             'page' => $page,
             'users' =>  $users
         ];
+
         return response()->json($data);
     }
 
@@ -63,13 +65,12 @@ class UserController extends Controller
             'password' => $request->password,
         ];
         $validator = Validator::make($data, [
-            'name' => 'required|string|min:3|max:50',
+            'name' => 'required|string|min:3|max:50', // 3-50 Char
             'email' => 'required|email|unique:users,email',  // Unique validation for email
-            'password' => 'required|string|min:8',
+            'password' => 'required|string|min:8', // Min 8 Char
         ]);
 
         if ($validator->fails()) {
-            // Handle the validation failure, e.g., return a response with errors
             return response()->json(['errors' => $validator->errors()], 422);
         }
         $newuser = new User;
@@ -78,6 +79,13 @@ class UserController extends Controller
         $newuser->password = bcrypt($request->password);
         $newuser->save();
         $inserted = User::find($newuser->id);
+
+        
+        // Send email to the user
+        Mail::to($newuser->email)->send(new UserCreated($request->name,$request->email));
+
+        // Send email to admin
+        Mail::to('admin@admin.com')->send(new UserCreated($request->name,$request->email));
 
         return response()->json($inserted, 201);
     }
